@@ -14,6 +14,8 @@ from fastapi import APIRouter, Form, Depends, Request, HTTPException
 from sqlalchemy.orm import Session
 from twilio.request_validator import RequestValidator
 
+from datetime import timezone, timedelta
+
 from app.config import get_settings
 from app.models.db import Engineer, get_session_factory
 from app.services import messaging as msg
@@ -21,6 +23,8 @@ from app.services import attendance as att
 from app.services.state import (
     ConversationStep, get_state, set_state, clear_state
 )
+
+EAT = timezone(timedelta(hours=3))
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
@@ -105,12 +109,52 @@ async def twilio_webhook(
         elif state.step == ConversationStep.AWAITING_CHECKOUT_LOCATION:
             clear_state(sender)
             result = att.process_checkout(db, engineer, latitude, longitude)
-            _send_checkout_response(sender, result)
+            _send_checkout_response(sender, result, db, engineer)
 
         else:
             # Unsolicited location — ignore gracefully
             msg.send_message(sender, "Location received but no active check-in/out in progress. Reply *IN* to check in.")
 
+        return {"status": "ok"}
+
+    # ── Free-text capture states (checked BEFORE keyword commands) ───────────
+    # These states expect prose from the engineer, not a keyword.
+    # We capture whatever they type (even if it looks like a command word).
+
+    if state.step == ConversationStep.AWAITING_PROGRESS_REPORT:
+        att.save_log(
+            db,
+            engineer_id=engineer.id,
+            log_type="progress_report",
+            content=Body.strip(),
+            attendance_id=state.attendance_id,
+            allocation_id=state.allocation_id,
+        )
+        # Advance to material request — keep the same attendance/allocation IDs
+        set_state(
+            sender,
+            ConversationStep.AWAITING_MATERIAL_REQUEST,
+            attendance_id=state.attendance_id,
+            allocation_id=state.allocation_id,
+        )
+        msg.send_message(sender, msg.msg_progress_report_saved())
+        return {"status": "ok"}
+
+    if state.step == ConversationStep.AWAITING_MATERIAL_REQUEST:
+        if Body.strip().upper() == "NONE":
+            clear_state(sender)
+            msg.send_message(sender, msg.msg_no_material_requests())
+        else:
+            att.save_log(
+                db,
+                engineer_id=engineer.id,
+                log_type="material_request",
+                content=Body.strip(),
+                attendance_id=state.attendance_id,
+                allocation_id=state.allocation_id,
+            )
+            clear_state(sender)
+            msg.send_message(sender, msg.msg_material_request_saved())
         return {"status": "ok"}
 
     # ── Text command ──────────────────────────────────────────────────────────
@@ -174,7 +218,12 @@ def _send_checkin_response(sender: str, result: dict) -> None:
         msg.send_message(sender, msg.msg_already_checked_in(result["site_name"]))
 
 
-def _send_checkout_response(sender: str, result: dict) -> None:
+def _send_checkout_response(
+    sender: str,
+    result: dict,
+    db,
+    engineer: Engineer,
+) -> None:
     status = result["status"]
     if status == "confirmed":
         msg.send_message(sender, msg.msg_checkout_confirmed(
@@ -186,16 +235,85 @@ def _send_checkout_response(sender: str, result: dict) -> None:
         ))
     elif status == "no_checkin":
         msg.send_message(sender, msg.msg_checkout_no_checkin())
+        return   # no check-out occurred — do not start progress report flow
+
+    # Checkout was recorded (confirmed or outside_geofence).
+    # Look up today's allocation so the log can be linked.
+    allocation = att.get_todays_allocation(db, engineer)
+    set_state(
+        sender,
+        ConversationStep.AWAITING_PROGRESS_REPORT,
+        attendance_id=result.get("attendance_id"),
+        allocation_id=allocation.id if allocation else None,
+    )
+    msg.send_message(sender, msg.msg_progress_report_prompt())
 
 
 def _handle_status(sender: str, engineer: Engineer, db: Session) -> None:
-    record = att.get_todays_attendance(db, engineer)
+    """
+    Send a STATUS reply.
+
+    If the engineer has a today's allocation, include the full job details
+    (site, address, scheduled start time, work description, Maps link) plus
+    their current attendance status.
+
+    Falls back to the simple attendance-only reply if no allocation exists.
+    """
+    allocation = att.get_todays_allocation(db, engineer)
+    record     = att.get_todays_attendance(db, engineer)
+
+    # Build attendance status string
     if not record:
-        msg.send_message(sender, msg.msg_status_not_checked_in())
+        attendance_status = "Not checked in yet — reply *IN* to check in."
     elif record.check_out_time is None:
-        time_str = record.check_in_time.strftime("%H:%M UTC")
-        site_name = record.site.name if record.site else "unknown site"
-        msg.send_message(sender, msg.msg_status_checked_in(site_name, time_str))
+        eat_in = record.check_in_time.replace(tzinfo=timezone.utc).astimezone(EAT)
+        attendance_status = f"Checked in at {eat_in.strftime('%H:%M')} EAT — reply *OUT* to check out."
     else:
-        site_name = record.site.name if record.site else "unknown site"
-        msg.send_message(sender, msg.msg_status_checked_out(site_name, record.hours_on_site or 0))
+        attendance_status = (
+            f"Checked out today after {record.hours_on_site or 0:.1f} hours on site."
+        )
+
+    if allocation:
+        site = allocation.site
+
+        # Scheduled start in EAT
+        if allocation.scheduled_start_time:
+            eat_start = allocation.scheduled_start_time.replace(
+                tzinfo=timezone.utc
+            ).astimezone(EAT)
+            sched_str = eat_start.strftime("%H:%M EAT")
+        else:
+            sched_str = "Not set"
+
+        maps_url = (
+            f"https://www.google.com/maps?q={site.latitude},{site.longitude}"
+        )
+
+        msg.send_message(
+            sender,
+            msg.msg_status_with_allocation(
+                site_name=site.name,
+                address=site.address or "",
+                scheduled_time_eat=sched_str,
+                work_description=allocation.work_description or "",
+                attendance_status=attendance_status,
+                maps_url=maps_url,
+            ),
+        )
+    else:
+        # No allocation — fall back to simple attendance reply
+        if not record:
+            msg.send_message(sender, msg.msg_status_not_checked_in())
+        elif record.check_out_time is None:
+            eat_in = record.check_in_time.replace(tzinfo=timezone.utc).astimezone(EAT)
+            site_name = record.site.name if record.site else "unknown site"
+            msg.send_message(
+                sender,
+                msg.msg_status_checked_in(site_name, eat_in.strftime("%H:%M EAT")),
+            )
+        else:
+            site_name = record.site.name if record.site else "unknown site"
+            msg.send_message(
+                sender,
+                msg.msg_status_checked_out(site_name, record.hours_on_site or 0),
+            )

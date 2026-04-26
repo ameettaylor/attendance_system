@@ -128,7 +128,7 @@ def msg_help() -> str:
         "Available commands:\n"
         "*IN* -- check in to your assigned site\n"
         "*OUT* -- check out from your current site\n"
-        "*STATUS* -- see your check-in status for today\n\n"
+        "*STATUS* -- see today's job and check-in status\n\n"
         "For help contact your supervisor."
     )
 
@@ -143,3 +143,60 @@ def msg_status_checked_out(site_name: str, hours: float) -> str:
 
 def msg_status_not_checked_in() -> str:
     return "You have not checked in today. Reply *IN* to check in."
+
+
+def msg_status_with_allocation(
+    site_name: str,
+    address: str,
+    scheduled_time_eat: str,
+    work_description: str,
+    attendance_status: str,
+    maps_url: str,
+) -> str:
+    """
+    Rich STATUS reply that includes today's allocation details.
+
+    attendance_status: human-readable string, e.g. "Checked in at 08:15 EAT"
+    scheduled_time_eat: "08:00 EAT" or "Not set"
+    """
+    lines = [
+        f"*Today's job:*",
+        f"📍 {site_name}",
+    ]
+    if address:
+        lines.append(f"   {address}")
+    lines.append(f"🗺 {maps_url}")
+    if scheduled_time_eat and scheduled_time_eat != "Not set":
+        lines.append(f"🕐 Start time: {scheduled_time_eat}")
+    if work_description:
+        lines.append(f"📋 Work: {work_description}")
+    lines.append(f"\n*Attendance:* {attendance_status}")
+    return "\n".join(lines)
+
+
+# ── Progress report / material request prompts ────────────────────────────────
+
+def msg_progress_report_prompt() -> str:
+    return (
+        "Please submit your end of day progress report. "
+        "Reply with a free text summary of the work completed today."
+    )
+
+
+def msg_progress_report_saved() -> str:
+    return (
+        "Progress report received. ✅\n\n"
+        "Any material requests? Reply with details (parts needed, quantities, etc.) "
+        "or reply *NONE* if no materials are required."
+    )
+
+
+def msg_material_request_saved() -> str:
+    return (
+        "Material request logged. ✅ "
+        "Your supervisor has been notified. Have a safe trip home!"
+    )
+
+
+def msg_no_material_requests() -> str:
+    return "No material requests logged. Have a safe trip home! 👋"

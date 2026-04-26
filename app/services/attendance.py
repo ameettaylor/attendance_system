@@ -6,8 +6,9 @@ Called by the webhook router when a valid location message is received.
 """
 
 from datetime import datetime, date
+from typing import Optional
 from sqlalchemy.orm import Session
-from app.models.db import Engineer, Site, Assignment, Attendance
+from app.models.db import Allocation, Engineer, Log, Site, Assignment, Attendance
 from app.services.geofence import GeoPoint, is_within_geofence
 from app.config import get_settings
 import logging
@@ -23,6 +24,20 @@ def get_todays_assignment(db: Session, engineer: Engineer):
             Assignment.engineer_id == engineer.id,
             Assignment.work_date == today,
         )
+        .first()
+    )
+
+
+def get_todays_allocation(db: Session, engineer: Engineer):
+    """Return today's allocation for this engineer (new dispatch system)."""
+    today = date.today()
+    return (
+        db.query(Allocation)
+        .filter(
+            Allocation.engineer_id == engineer.id,
+            Allocation.work_date == today,
+        )
+        .order_by(Allocation.scheduled_start_time.nullslast())
         .first()
     )
 
@@ -169,4 +184,41 @@ def process_checkout(
     )
 
     status = "confirmed" if within else "outside_geofence"
-    return {"status": status, "site_name": site.name, "distance_m": distance_m, "hours": hours, "time_str": time_str}
+    return {
+        "status":        status,
+        "site_name":     site.name,
+        "distance_m":    distance_m,
+        "hours":         hours,
+        "time_str":      time_str,
+        "attendance_id": open_record.id,   # needed to link progress report log
+    }
+
+
+def save_log(
+    db: Session,
+    engineer_id: int,
+    log_type: str,
+    content: str,
+    attendance_id: Optional[int] = None,
+    allocation_id: Optional[int] = None,
+) -> Log:
+    """
+    Persist a progress report or material request to the logs table.
+
+    log_type: "progress_report" | "material_request"
+    """
+    entry = Log(
+        engineer_id=engineer_id,
+        log_type=log_type,
+        content=content,
+        attendance_id=attendance_id,
+        allocation_id=allocation_id,
+    )
+    db.add(entry)
+    db.commit()
+    db.refresh(entry)
+    logger.info(
+        "Log saved: engineer_id=%s type=%s attendance_id=%s allocation_id=%s",
+        engineer_id, log_type, attendance_id, allocation_id,
+    )
+    return entry
