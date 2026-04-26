@@ -7,6 +7,11 @@ Tables:
     assignments  — which engineer is assigned to which site on which date
     attendance   — check-in / check-out records with coordinates and timestamps
     supervisors  — WhatsApp numbers that receive the daily summary
+    customers    — customer accounts linked to allocations
+    agents       — dispatcher / supervisor web dashboard login accounts
+    allocations  — new dispatch table (multiple techs per site per day)
+    logs         — progress reports + material requests from the WhatsApp bot
+    alerts       — late check-in and geofence breach records
 """
 
 from datetime import datetime, date
@@ -130,6 +135,110 @@ class Supervisor(Base):
 
     def __repr__(self):
         return f"<Supervisor {self.name} ({self.whatsapp_number})>"
+
+
+class Customer(Base):
+    __tablename__ = "customers"
+
+    id            = Column(Integer, primary_key=True)
+    name          = Column(String(120), nullable=False)
+    contact_name  = Column(String(120), nullable=True)
+    contact_phone = Column(String(30), nullable=True)
+    address       = Column(Text, nullable=True)
+    active        = Column(Boolean, default=True, nullable=False)
+    created_at    = Column(DateTime, default=datetime.utcnow, nullable=False)
+
+    allocations = relationship("Allocation", back_populates="customer")
+
+    def __repr__(self):
+        return f"<Customer {self.name}>"
+
+
+class Agent(Base):
+    """Web dashboard login accounts for dispatchers and supervisors."""
+    __tablename__ = "agents"
+
+    id            = Column(Integer, primary_key=True)
+    username      = Column(String(60), unique=True, nullable=False)
+    password_hash = Column(String(255), nullable=False)
+    email         = Column(String(120), unique=True, nullable=True)
+    role          = Column(String(20), nullable=False, default="dispatcher")
+    # role values: dispatcher | supervisor | admin
+    active        = Column(Boolean, default=True, nullable=False)
+    created_at    = Column(DateTime, default=datetime.utcnow, nullable=False)
+
+    def __repr__(self):
+        return f"<Agent {self.username} ({self.role})>"
+
+
+class Allocation(Base):
+    """
+    New dispatch table that replaces direct use of assignments for scheduling.
+    Supports multiple technicians per site per day.
+    """
+    __tablename__ = "allocations"
+
+    id                    = Column(Integer, primary_key=True)
+    engineer_id           = Column(Integer, ForeignKey("engineers.id"), nullable=False)
+    site_id               = Column(Integer, ForeignKey("sites.id"), nullable=False)
+    customer_id           = Column(Integer, ForeignKey("customers.id"), nullable=True)
+    work_date             = Column(Date, nullable=False)
+    scheduled_start_time  = Column(DateTime, nullable=True)   # UTC
+    work_description      = Column(Text, nullable=True)
+    notification_sent     = Column(Boolean, default=False, nullable=False)
+    morning_reminder_sent = Column(Boolean, default=False, nullable=False)
+    created_at            = Column(DateTime, default=datetime.utcnow, nullable=False)
+
+    engineer = relationship("Engineer")
+    site     = relationship("Site")
+    customer = relationship("Customer", back_populates="allocations")
+    logs     = relationship("Log", back_populates="allocation")
+    alerts   = relationship("Alert", back_populates="allocation")
+
+    def __repr__(self):
+        return f"<Allocation engineer={self.engineer_id} site={self.site_id} date={self.work_date}>"
+
+
+class Log(Base):
+    """Progress reports and material requests submitted via the WhatsApp bot."""
+    __tablename__ = "logs"
+
+    id            = Column(Integer, primary_key=True)
+    engineer_id   = Column(Integer, ForeignKey("engineers.id"), nullable=False)
+    attendance_id = Column(Integer, ForeignKey("attendance.id"), nullable=True)
+    allocation_id = Column(Integer, ForeignKey("allocations.id"), nullable=True)
+    log_type      = Column(String(30), nullable=False)  # progress_report | material_request
+    content       = Column(Text, nullable=False)
+    created_at    = Column(DateTime, default=datetime.utcnow, nullable=False)
+
+    engineer   = relationship("Engineer")
+    attendance = relationship("Attendance")
+    allocation = relationship("Allocation", back_populates="logs")
+
+    def __repr__(self):
+        return f"<Log engineer={self.engineer_id} type={self.log_type}>"
+
+
+class Alert(Base):
+    """Late check-in and geofence breach records."""
+    __tablename__ = "alerts"
+
+    id            = Column(Integer, primary_key=True)
+    engineer_id   = Column(Integer, ForeignKey("engineers.id"), nullable=False)
+    allocation_id = Column(Integer, ForeignKey("allocations.id"), nullable=True)
+    attendance_id = Column(Integer, ForeignKey("attendance.id"), nullable=True)
+    alert_type    = Column(String(30), nullable=False)  # late_checkin | geofence_breach
+    message       = Column(Text, nullable=False)
+    resolved      = Column(Boolean, default=False, nullable=False)
+    whatsapp_sent = Column(Boolean, default=False, nullable=False)
+    created_at    = Column(DateTime, default=datetime.utcnow, nullable=False)
+
+    engineer   = relationship("Engineer")
+    allocation = relationship("Allocation", back_populates="alerts")
+    attendance = relationship("Attendance")
+
+    def __repr__(self):
+        return f"<Alert engineer={self.engineer_id} type={self.alert_type} resolved={self.resolved}>"
 
 
 # ── Database session factory ──────────────────────────────────────────────────

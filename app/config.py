@@ -22,6 +22,11 @@ class Settings(BaseSettings):
     # e.g. whatsapp:+254700000001,whatsapp:+254700000002
     supervisor_numbers: str = ""
 
+    # Web dashboard session signing key — generate with:
+    #   python3 -c "import secrets; print(secrets.token_hex(32))"
+    # Must be set in .env; no default so it cannot accidentally be left empty.
+    session_secret: str
+
     class Config:
         env_file = ".env"
         env_file_encoding = "utf-8"

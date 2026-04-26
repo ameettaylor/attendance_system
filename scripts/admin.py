@@ -33,9 +33,10 @@ from dotenv import load_dotenv
 load_dotenv()
 
 from app.models.db import (
-    Engineer, Site, Assignment, Attendance, Supervisor,
+    Engineer, Site, Assignment, Attendance, Supervisor, Agent,
     get_session_factory, init_db,
 )
+from app.routers.auth import hash_password
 from app.services.scheduler import send_daily_summary
 
 
@@ -188,6 +189,75 @@ def cmd_supervisor_list(args):
         print(f"{s.id:<5} {s.name:<25} {s.whatsapp_number:<25} {'Yes' if s.active else 'No'}")
 
 
+# ── Agent commands (web dashboard accounts) ───────────────────────────────────
+
+def cmd_agent_create(args):
+    """Create a new web dashboard login account."""
+    import getpass
+    db = get_db()
+
+    existing = db.query(Agent).filter(Agent.username == args.username).first()
+    if existing:
+        print(f"ERROR: An agent with username '{args.username}' already exists (id={existing.id}).")
+        return
+
+    # Prompt for password interactively (not passed as CLI arg — keeps it off
+    # shell history and process listings).
+    if args.password:
+        password = args.password
+    else:
+        password = getpass.getpass(f"Password for '{args.username}': ")
+        confirm  = getpass.getpass("Confirm password: ")
+        if password != confirm:
+            print("ERROR: Passwords do not match.")
+            return
+
+    if len(password) < 8:
+        print("ERROR: Password must be at least 8 characters.")
+        return
+
+    role = args.role or "dispatcher"
+    valid_roles = ("dispatcher", "supervisor", "admin")
+    if role not in valid_roles:
+        print(f"ERROR: Role must be one of: {', '.join(valid_roles)}")
+        return
+
+    agent = Agent(
+        username=args.username.strip(),
+        password_hash=hash_password(password),
+        email=args.email or None,
+        role=role,
+    )
+    db.add(agent)
+    db.commit()
+    db.refresh(agent)
+    print(f"Created agent: id={agent.id}  username={agent.username}  role={agent.role}")
+    print("You can now log in at /login with these credentials.")
+
+
+def cmd_agent_list(args):
+    db = get_db()
+    agents = db.query(Agent).order_by(Agent.id).all()
+    if not agents:
+        print("No agents registered.")
+        return
+    print(f"{'ID':<5} {'Username':<20} {'Role':<15} {'Email':<30} {'Active'}")
+    print("-" * 80)
+    for a in agents:
+        print(f"{a.id:<5} {a.username:<20} {a.role:<15} {(a.email or ''):<30} {'Yes' if a.active else 'No'}")
+
+
+def cmd_agent_deactivate(args):
+    db = get_db()
+    agent = db.query(Agent).filter(Agent.id == args.id).first()
+    if not agent:
+        print(f"ERROR: Agent id={args.id} not found.")
+        return
+    agent.active = False
+    db.commit()
+    print(f"Deactivated agent: {agent.username}")
+
+
 # ── Report commands ───────────────────────────────────────────────────────────
 
 def cmd_report_today(args):
@@ -282,6 +352,27 @@ def main():
 
     p = sup_sub.add_parser("list")
     p.set_defaults(func=cmd_supervisor_list)
+
+    # agent (web dashboard accounts)
+    agent_p = sub.add_parser("agent", help="Manage web dashboard login accounts")
+    agent_sub = agent_p.add_subparsers(dest="subcommand", required=True)
+
+    p = agent_sub.add_parser("create", help="Create a new dispatcher/supervisor account")
+    p.add_argument("username", help="Login username")
+    p.add_argument("--password", default=None,
+                   help="Password (omit to be prompted securely)")
+    p.add_argument("--email", default=None, help="Optional email address")
+    p.add_argument("--role", default="dispatcher",
+                   choices=["dispatcher", "supervisor", "admin"],
+                   help="Account role (default: dispatcher)")
+    p.set_defaults(func=cmd_agent_create)
+
+    p = agent_sub.add_parser("list", help="List all agent accounts")
+    p.set_defaults(func=cmd_agent_list)
+
+    p = agent_sub.add_parser("deactivate", help="Deactivate an agent account")
+    p.add_argument("id", type=int, help="Agent ID")
+    p.set_defaults(func=cmd_agent_deactivate)
 
     # report
     p = sub.add_parser("report")

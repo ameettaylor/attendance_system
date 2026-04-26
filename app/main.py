@@ -7,10 +7,15 @@ Start with:
 
 import logging
 from contextlib import asynccontextmanager
-from fastapi import FastAPI
 
+from fastapi import FastAPI, Request
+from fastapi.responses import RedirectResponse
+from starlette.middleware.sessions import SessionMiddleware
+
+from app.config import get_settings
 from app.models.db import init_db
 from app.routers import webhook
+from app.routers.auth import AuthRedirect, router as auth_router
 from app.services.scheduler import start_scheduler, stop_scheduler
 
 logging.basicConfig(
@@ -35,13 +40,35 @@ async def lifespan(app: FastAPI):
 app = FastAPI(
     title="Field Engineer Time & Attendance",
     description="WhatsApp-based check-in/check-out system with geofencing.",
-    version="1.0.0",
+    version="2.0.0",
     lifespan=lifespan,
 )
 
+# ── Session middleware (must be added before routes are called) ───────────────
+# Uses itsdangerous to sign the cookie; SESSION_SECRET must be set in .env.
+settings = get_settings()
+app.add_middleware(
+    SessionMiddleware,
+    secret_key=settings.session_secret,
+    session_cookie="fsm_session",
+    max_age=60 * 60 * 10,   # 10 hours
+    https_only=False,        # set True once on Railway with HTTPS
+    same_site="lax",
+)
+
+
+# ── Exception handler: redirect unauthenticated users to /login ───────────────
+@app.exception_handler(AuthRedirect)
+async def auth_redirect_handler(request: Request, exc: AuthRedirect):
+    return RedirectResponse(url=exc.url, status_code=302)
+
+
+# ── Routers ───────────────────────────────────────────────────────────────────
+app.include_router(auth_router)
 app.include_router(webhook.router)
 
 
+# ── Health check (must stay working throughout all modules) ───────────────────
 @app.get("/health")
 def health_check():
     """Railway health check endpoint."""
