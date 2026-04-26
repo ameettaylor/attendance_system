@@ -61,6 +61,29 @@
                     class="input resize-none"></textarea>
         </div>
 
+        <!-- Notification toggles -->
+        <div class="rounded-lg border border-gray-200 bg-gray-50 px-4 py-3 space-y-2.5">
+          <p class="text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">Notifications</p>
+
+          <div class="flex items-start gap-3">
+            <input id="suppress_evening" name="suppress_evening" type="checkbox"
+                   class="mt-0.5 w-4 h-4 rounded text-blue-600 border-gray-300" />
+            <label for="suppress_evening" class="text-xs text-gray-700 leading-snug">
+              Suppress evening notification
+              <span class="block text-gray-400 font-normal">Do not send job details the night before</span>
+            </label>
+          </div>
+
+          <div class="flex items-start gap-3">
+            <input id="suppress_morning" name="suppress_morning" type="checkbox"
+                   class="mt-0.5 w-4 h-4 rounded text-blue-600 border-gray-300" />
+            <label for="suppress_morning" class="text-xs text-gray-700 leading-snug">
+              Suppress morning reminder
+              <span class="block text-gray-400 font-normal">Do not send the 07:00 EAT reminder</span>
+            </label>
+          </div>
+        </div>
+
         <button type="submit" class="btn-primary w-full">Create Allocation</button>
       </form>
     </div>

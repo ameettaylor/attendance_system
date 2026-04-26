@@ -545,6 +545,8 @@ def allocation_create(
     work_date: str = Form(...),
     scheduled_start_time: str = Form(default=""),
     work_description: str = Form(default=""),
+    suppress_evening: str = Form(default=""),
+    suppress_morning: str = Form(default=""),
 ):
     try:
         w_date = date.fromisoformat(work_date)
@@ -567,6 +569,9 @@ def allocation_create(
 
     utc_start = _eat_to_utc(w_date, scheduled_start_time)
 
+    # Checkboxes: checked = "on", unchecked = "" (not submitted at all).
+    # Setting the flag to True tells the scheduler this notification is
+    # already "sent" so it will be skipped.
     alloc = Allocation(
         engineer_id=engineer_id,
         site_id=site_id,
@@ -574,10 +579,19 @@ def allocation_create(
         work_date=w_date,
         scheduled_start_time=utc_start,
         work_description=work_description.strip() or None,
+        notification_sent=(suppress_evening == "on"),
+        morning_reminder_sent=(suppress_morning == "on"),
     )
     db.add(alloc)
     db.commit()
-    set_flash(request, f"Allocation created: {eng.name} → {site.name} on {w_date}.")
+
+    suppressed = []
+    if suppress_evening == "on":
+        suppressed.append("evening notification")
+    if suppress_morning == "on":
+        suppressed.append("morning reminder")
+    suffix = f" (suppressed: {', '.join(suppressed)})" if suppressed else ""
+    set_flash(request, f"Allocation created: {eng.name} → {site.name} on {w_date}{suffix}.")
     return RedirectResponse(f"/allocations?work_date={work_date}", status_code=302)
 
 
