@@ -200,3 +200,72 @@ def msg_material_request_saved() -> str:
 
 def msg_no_material_requests() -> str:
     return "No material requests logged. Have a safe trip home! 👋"
+
+
+# ── Notification scheduler messages ───────────────────────────────────────────
+
+def msg_evening_notification(
+    engineer_name: str,
+    site_name: str,
+    address: str,
+    work_date_str: str,
+    scheduled_time_eat: str,
+    work_description: str,
+    maps_url: str,
+) -> str:
+    """Evening-before job details sent at the technician's preferred notification time."""
+    lines = [
+        f"Hi {engineer_name}! 👋 Here are your job details for *{work_date_str}*:",
+        "",
+        f"📍 *{site_name}*",
+    ]
+    if address:
+        lines.append(f"   {address}")
+    lines.append(f"🗺 {maps_url}")
+    if scheduled_time_eat:
+        lines.append(f"🕐 Start time: *{scheduled_time_eat}*")
+    if work_description:
+        lines.append(f"📋 Work: {work_description}")
+    lines += [
+        "",
+        "Reply *IN* tomorrow when you arrive on site to check in.",
+        "Reply *STATUS* at any time to see these details again.",
+    ]
+    return "\n".join(lines)
+
+
+def msg_morning_reminder(
+    engineer_name: str,
+    site_name: str,
+    scheduled_time_eat: str,
+    maps_url: str,
+) -> str:
+    """Morning-of reminder sent at 07:00 EAT."""
+    lines = [
+        f"Good morning {engineer_name}! ☀️",
+        f"Reminder: you are scheduled at *{site_name}* today.",
+    ]
+    if scheduled_time_eat:
+        lines.append(f"🕐 Start time: *{scheduled_time_eat}*")
+    lines += [
+        f"🗺 {maps_url}",
+        "",
+        "Reply *IN* when you arrive to check in. Have a great day!",
+    ]
+    return "\n".join(lines)
+
+
+def msg_late_checkin_supervisor_alert(
+    engineer_name: str,
+    site_name: str,
+    scheduled_time_eat: str,
+    minutes_overdue: int,
+) -> str:
+    """Supervisor WhatsApp alert when an engineer has not checked in on time."""
+    return (
+        f"⚠️ *Late check-in alert*\n\n"
+        f"{engineer_name} was scheduled at *{site_name}* "
+        f"at {scheduled_time_eat} EAT and has not checked in "
+        f"({minutes_overdue} minutes overdue).\n\n"
+        f"Please follow up."
+    )
