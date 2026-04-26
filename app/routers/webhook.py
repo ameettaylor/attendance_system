@@ -17,7 +17,7 @@ from twilio.request_validator import RequestValidator
 from datetime import timezone, timedelta
 
 from app.config import get_settings
-from app.models.db import Engineer, get_session_factory
+from app.models.db import Alert, Engineer, Supervisor, get_session_factory
 from app.services import messaging as msg
 from app.services import attendance as att
 from app.services.state import (
@@ -104,7 +104,7 @@ async def twilio_webhook(
         if state.step == ConversationStep.AWAITING_CHECKIN_LOCATION:
             clear_state(sender)
             result = att.process_checkin(db, engineer, latitude, longitude)
-            _send_checkin_response(sender, result)
+            _send_checkin_response(sender, result, db, engineer)
 
         elif state.step == ConversationStep.AWAITING_CHECKOUT_LOCATION:
             clear_state(sender)
@@ -202,7 +202,12 @@ async def twilio_webhook(
 
 # ── Response helpers ──────────────────────────────────────────────────────────
 
-def _send_checkin_response(sender: str, result: dict) -> None:
+def _send_checkin_response(
+    sender: str,
+    result: dict,
+    db,
+    engineer: Engineer,
+) -> None:
     status = result["status"]
     if status == "confirmed":
         msg.send_message(sender, msg.msg_checkin_confirmed(
@@ -212,6 +217,13 @@ def _send_checkin_response(sender: str, result: dict) -> None:
         msg.send_message(sender, msg.msg_checkin_outside_geofence(
             result["site_name"], result["distance_m"]
         ))
+        _fire_geofence_alert(
+            db, engineer,
+            attendance_id=result.get("attendance_id"),
+            site_name=result["site_name"],
+            distance_m=result["distance_m"],
+            event_type="Check-in",
+        )
     elif status == "no_assignment":
         msg.send_message(sender, msg.msg_checkin_no_assignment())
     elif status == "already_checked_in":
@@ -233,6 +245,13 @@ def _send_checkout_response(
         msg.send_message(sender, msg.msg_checkout_outside_geofence(
             result["site_name"], result["distance_m"]
         ))
+        _fire_geofence_alert(
+            db, engineer,
+            attendance_id=result.get("attendance_id"),
+            site_name=result["site_name"],
+            distance_m=result["distance_m"],
+            event_type="Check-out",
+        )
     elif status == "no_checkin":
         msg.send_message(sender, msg.msg_checkout_no_checkin())
         return   # no check-out occurred — do not start progress report flow
@@ -317,3 +336,56 @@ def _handle_status(sender: str, engineer: Engineer, db: Session) -> None:
                 sender,
                 msg.msg_status_checked_out(site_name, record.hours_on_site or 0),
             )
+
+
+# ── Geofence breach: create Alert + WhatsApp supervisors immediately ──────────
+
+def _fire_geofence_alert(
+    db,
+    engineer: Engineer,
+    attendance_id,
+    site_name: str,
+    distance_m: float,
+    event_type: str,
+) -> None:
+    """
+    Called immediately after a geofence breach (checkin or checkout).
+    Creates an Alert record and notifies all active supervisors via WhatsApp.
+    """
+    alert_message = (
+        f"{event_type} outside geofence: {engineer.name} at {site_name}, "
+        f"{distance_m:.0f}m from site centre."
+    )
+
+    alert = Alert(
+        engineer_id=engineer.id,
+        attendance_id=attendance_id,
+        alert_type="geofence_breach",
+        message=alert_message,
+    )
+    db.add(alert)
+
+    supervisors = db.query(Supervisor).filter(Supervisor.active == True).all()  # noqa: E712
+    wa_text = msg.msg_geofence_breach_supervisor_alert(
+        engineer_name=engineer.name,
+        site_name=site_name,
+        event_type=event_type,
+        distance_m=distance_m,
+    )
+
+    for supervisor in supervisors:
+        try:
+            msg.send_message(supervisor.whatsapp_number, wa_text)
+            logger.warning(
+                "Geofence breach alert sent to %s: %s", supervisor.name, alert_message
+            )
+        except Exception as exc:
+            logger.error(
+                "Failed to send geofence alert to supervisor %s: %s",
+                supervisor.name, exc,
+            )
+
+    if supervisors:
+        alert.whatsapp_sent = True
+
+    db.commit()

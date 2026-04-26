@@ -17,6 +17,7 @@ from app.config import get_settings
 from app.models.db import init_db
 from app.routers import webhook
 from app.routers.auth import AuthRedirect, router as auth_router
+from app.routers.supervisor import router as supervisor_router
 from app.routers.web import router as web_router
 from app.services.scheduler import start_scheduler, stop_scheduler
 
@@ -73,6 +74,7 @@ app.mount("/static", StaticFiles(directory=_os.path.abspath(_static_dir)), name=
 # ── Routers ───────────────────────────────────────────────────────────────────
 app.include_router(auth_router)
 app.include_router(web_router)
+app.include_router(supervisor_router)
 app.include_router(webhook.router)
 
 

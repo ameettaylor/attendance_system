@@ -1,0 +1,24 @@
+{% extends "base.html" %}
+
+{% block title %}Supervisor Dashboard — Field Engineer Dispatch{% endblock %}
+{% block page_title %}Supervisor Dashboard — {{ today.strftime("%A, %d %b %Y") }}{% endblock %}
+
+{% block content %}
+
+<!-- Auto-refresh indicator -->
+<div class="flex items-center justify-end mb-4 gap-2 text-xs text-gray-400">
+  <span class="inline-block w-2 h-2 rounded-full bg-green-400 animate-pulse"></span>
+  Auto-refreshes every 60 s
+</div>
+
+<!-- Three panels — wrapped in an HTMX polling div -->
+<div
+  id="supervisor-panels"
+  hx-get="/supervisor/panels"
+  hx-trigger="every 60s"
+  hx-swap="innerHTML"
+>
+  {% include "partials/supervisor_panels.html" %}
+</div>
+
+{% endblock %}

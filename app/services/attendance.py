@@ -128,7 +128,13 @@ def process_checkin(
     )
 
     status = "confirmed" if within else "outside_geofence"
-    return {"status": status, "site_name": site.name, "distance_m": distance_m, "time_str": time_str}
+    return {
+        "status":        status,
+        "site_name":     site.name,
+        "distance_m":    distance_m,
+        "time_str":      time_str,
+        "attendance_id": record.id,   # needed to link geofence breach alert
+    }
 
 
 def process_checkout(

@@ -255,6 +255,22 @@ def msg_morning_reminder(
     return "\n".join(lines)
 
 
+def msg_geofence_breach_supervisor_alert(
+    engineer_name: str,
+    site_name: str,
+    event_type: str,
+    distance_m: float,
+) -> str:
+    """Supervisor WhatsApp alert when an engineer checks in/out outside the geofence."""
+    return (
+        f"⚠️ *Geofence breach — {event_type}*\n\n"
+        f"{engineer_name} {event_type.lower()}ed at *{site_name}* "
+        f"but was *{distance_m:.0f}m* from the site centre "
+        f"(outside the allowed radius).\n\n"
+        f"This has been flagged for review."
+    )
+
+
 def msg_late_checkin_supervisor_alert(
     engineer_name: str,
     site_name: str,
