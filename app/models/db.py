@@ -34,6 +34,11 @@ class Engineer(Base):
     active          = Column(Boolean, default=True, nullable=False)
     created_at      = Column(DateTime, default=datetime.utcnow, nullable=False)
 
+    # Added in Module 1 migration — dispatcher profile fields
+    technician_type             = Column(String(30), nullable=True)   # Project | Maintenance | AdHoc
+    skill_level                 = Column(String(30), nullable=True)
+    preferred_notification_time = Column(String(5),  nullable=True)   # HH:MM in EAT
+
     assignments = relationship("Assignment", back_populates="engineer")
     attendance  = relationship("Attendance", back_populates="engineer")
 
