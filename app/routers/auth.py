@@ -20,7 +20,6 @@ from typing import Optional
 import bcrypt
 from fastapi import APIRouter, Depends, Form, Request
 from fastapi.responses import HTMLResponse, RedirectResponse
-from fastapi.templating import Jinja2Templates
 from sqlalchemy.orm import Session
 
 from app.models.db import Agent, get_session_factory
@@ -101,14 +100,8 @@ def require_auth(request: Request) -> dict:
     }
 
 
-# ── Jinja2 templates ──────────────────────────────────────────────────────────
-# Templates are resolved relative to the project root (one level above app/).
-# Module 3 will set up a shared templates instance on the app; for now we
-# create a local one just for the login page.
-
-import os as _os
-_templates_dir = _os.path.join(_os.path.dirname(__file__), "..", "..", "templates")
-templates = Jinja2Templates(directory=_os.path.abspath(_templates_dir))
+# ── Jinja2 templates (shared instance with EAT filters) ──────────────────────
+from app.utils.templates import templates  # noqa: E402
 
 
 # ── Routes ────────────────────────────────────────────────────────────────────

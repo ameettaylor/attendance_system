@@ -1,0 +1,201 @@
+{% extends "base.html" %}
+
+{% block title %}Allocations — Field Engineer Dispatch{% endblock %}
+{% block page_title %}Allocations — {{ selected_date | eat_date }}{% endblock %}
+
+{% block content %}
+<div class="flex gap-6">
+
+  <!-- ── Add allocation form ──────────────────────────────────────────────── -->
+  <div class="w-72 shrink-0">
+    <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-5">
+      <h2 class="text-sm font-semibold text-gray-700 mb-4">New Allocation</h2>
+      <form method="post" action="/allocations" class="space-y-4">
+
+        <div>
+          <label class="label">Date <span class="text-red-400">*</span></label>
+          <input name="work_date" type="date" required
+                 value="{{ selected_date.isoformat() }}" class="input" />
+        </div>
+
+        <div>
+          <label class="label">Technician <span class="text-red-400">*</span></label>
+          <select name="engineer_id" required class="input">
+            <option value="">— select —</option>
+            {% for e in active_engineers %}
+            <option value="{{ e.id }}">{{ e.name }}</option>
+            {% endfor %}
+          </select>
+        </div>
+
+        <div>
+          <label class="label">Site <span class="text-red-400">*</span></label>
+          <select name="site_id" required class="input">
+            <option value="">— select —</option>
+            {% for s in active_sites %}
+            <option value="{{ s.id }}">{{ s.name }}</option>
+            {% endfor %}
+          </select>
+        </div>
+
+        <div>
+          <label class="label">Customer</label>
+          <select name="customer_id" class="input">
+            <option value="">— none —</option>
+            {% for c in active_customers %}
+            <option value="{{ c.id }}">{{ c.name }}</option>
+            {% endfor %}
+          </select>
+        </div>
+
+        <div>
+          <label class="label">Scheduled start time (EAT)</label>
+          <input name="scheduled_start_time" type="time" class="input" />
+          <p class="mt-1 text-xs text-gray-400">Stored as UTC. Leave blank if unscheduled.</p>
+        </div>
+
+        <div>
+          <label class="label">Work description</label>
+          <textarea name="work_description" rows="3"
+                    placeholder="CCTV installation, camera cabling…"
+                    class="input resize-none"></textarea>
+        </div>
+
+        <button type="submit" class="btn-primary w-full">Create Allocation</button>
+      </form>
+    </div>
+  </div>
+
+  <!-- ── Allocation list ──────────────────────────────────────────────────── -->
+  <div class="flex-1 min-w-0">
+
+    <!-- Date navigator -->
+    <div class="flex items-center gap-3 mb-4">
+      {% set prev_date = (selected_date - selected_date.__class__(selected_date.year, selected_date.month, selected_date.day).__class__.resolution).isoformat() %}
+      <a href="/allocations?work_date={{ (selected_date.toordinal() - 1) | string }}"
+         class="p-2 rounded-lg bg-white border border-gray-200 hover:bg-gray-50 text-gray-600">
+        <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M15 19l-7-7 7-7" />
+        </svg>
+      </a>
+      <form method="get" action="/allocations" class="flex items-center gap-2">
+        <input name="work_date" type="date" value="{{ selected_date.isoformat() }}"
+               class="rounded-lg border border-gray-300 px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
+        <button type="submit"
+                class="px-3 py-1.5 rounded-lg bg-white border border-gray-200 text-sm text-gray-600 hover:bg-gray-50">
+          Go
+        </button>
+      </form>
+      <a href="/allocations?work_date={{ (selected_date.toordinal() + 1) | string }}"
+         class="p-2 rounded-lg bg-white border border-gray-200 hover:bg-gray-50 text-gray-600">
+        <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7" />
+        </svg>
+      </a>
+      <a href="/allocations"
+         class="ml-2 px-3 py-1.5 rounded-lg bg-blue-50 border border-blue-200 text-sm text-blue-700 hover:bg-blue-100">
+        Today
+      </a>
+    </div>
+
+    <div class="bg-white rounded-xl shadow-sm border border-gray-100">
+      <div class="px-5 py-4 border-b border-gray-100">
+        <h2 class="text-sm font-semibold text-gray-700">
+          Allocations for {{ selected_date | eat_date }}
+          <span class="ml-2 text-xs font-normal text-gray-400">{{ alloc_list | length }} total</span>
+        </h2>
+      </div>
+
+      {% if alloc_list %}
+      <div class="overflow-x-auto">
+        <table class="w-full text-sm">
+          <thead class="bg-gray-50 text-xs text-gray-500 uppercase tracking-wide">
+            <tr>
+              <th class="px-5 py-3 text-left font-medium">Technician</th>
+              <th class="px-5 py-3 text-left font-medium">Site</th>
+              <th class="px-5 py-3 text-left font-medium">Customer</th>
+              <th class="px-5 py-3 text-left font-medium">Start (EAT)</th>
+              <th class="px-5 py-3 text-left font-medium">Work</th>
+              <th class="px-5 py-3 text-left font-medium">Attendance</th>
+              <th class="px-5 py-3 text-left font-medium"></th>
+            </tr>
+          </thead>
+          <tbody class="divide-y divide-gray-50">
+            {% for a in alloc_list %}
+            <tr class="hover:bg-gray-50 transition-colors">
+              <td class="px-5 py-3 font-medium text-gray-800">{{ a.engineer.name }}</td>
+              <td class="px-5 py-3 text-gray-600">
+                {{ a.site.name }}
+                {% if a.site.address %}
+                <span class="block text-xs text-gray-400 truncate max-w-[160px]">{{ a.site.address }}</span>
+                {% endif %}
+                <a href="https://www.google.com/maps?q={{ a.site.latitude }},{{ a.site.longitude }}"
+                   target="_blank"
+                   class="text-xs text-blue-500 hover:underline">Map ↗</a>
+              </td>
+              <td class="px-5 py-3 text-gray-500 text-xs">{{ a.customer.name if a.customer else "—" }}</td>
+              <td class="px-5 py-3 text-gray-600 text-xs">{{ a.scheduled_start_time | eat_time }}</td>
+              <td class="px-5 py-3 text-gray-500 text-xs max-w-[160px] truncate">
+                {{ a.work_description or "—" }}
+              </td>
+              <td class="px-5 py-3">
+                {% if a.engineer_id in completed_checkins %}
+                  <span class="px-2 py-0.5 rounded text-xs font-medium bg-gray-100 text-gray-600">Done</span>
+                {% elif a.engineer_id in open_checkins %}
+                  <span class="px-2 py-0.5 rounded text-xs font-medium bg-green-100 text-green-700 flex items-center gap-1 w-fit">
+                    <span class="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse"></span>
+                    On site
+                  </span>
+                {% else %}
+                  <span class="px-2 py-0.5 rounded text-xs font-medium bg-yellow-50 text-yellow-700">Not in</span>
+                {% endif %}
+              </td>
+              <td class="px-5 py-3">
+                <form method="post" action="/allocations/{{ a.id }}/delete"
+                      onsubmit="return confirm('Remove this allocation?')">
+                  <input type="hidden" name="work_date" value="{{ selected_date.isoformat() }}" />
+                  <button type="submit"
+                          class="text-xs text-red-500 hover:text-red-700 hover:underline">
+                    Remove
+                  </button>
+                </form>
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      {% else %}
+      <div class="px-5 py-12 text-center">
+        <p class="text-sm text-gray-400">No allocations for this date.</p>
+        <p class="text-xs text-gray-300 mt-1">Use the form to assign technicians to sites.</p>
+      </div>
+      {% endif %}
+    </div>
+
+  </div><!-- end list panel -->
+</div>
+
+<style>
+  .label       { @apply block text-xs font-medium text-gray-600 mb-1; }
+  .input       { @apply w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent; }
+  .btn-primary { @apply rounded-lg bg-blue-600 hover:bg-blue-700 text-white font-medium py-2 px-4 text-sm transition-colors; }
+</style>
+
+<script>
+  // Convert date ordinal links to proper ISO date navigation
+  document.querySelectorAll('a[href*="/allocations?work_date="]').forEach(function(a) {
+    var href = a.getAttribute('href');
+    var match = href.match(/work_date=(\d+)$/);
+    if (match) {
+      // ordinal values passed as strings — convert in browser
+      var ordinal = parseInt(match[1]);
+      // JS Date epoch is 1970-01-01 = ordinal 719163 in Python
+      var PYTHON_EPOCH = 719163;
+      var d = new Date((ordinal - PYTHON_EPOCH) * 86400 * 1000);
+      var iso = d.toISOString().slice(0, 10);
+      a.setAttribute('href', '/allocations?work_date=' + iso);
+    }
+  });
+</script>
+{% endblock %}

@@ -1,0 +1,50 @@
+{% if records %}
+<div class="overflow-x-auto">
+  <table class="w-full text-sm">
+    <thead class="bg-gray-50 text-xs text-gray-500 uppercase tracking-wide">
+      <tr>
+        <th class="px-5 py-3 text-left font-medium">Technician</th>
+        <th class="px-5 py-3 text-left font-medium">Site</th>
+        <th class="px-5 py-3 text-left font-medium">Check-in (EAT)</th>
+        <th class="px-5 py-3 text-left font-medium">Check-out (EAT)</th>
+        <th class="px-5 py-3 text-left font-medium">Hours</th>
+        <th class="px-5 py-3 text-left font-medium">Flag</th>
+      </tr>
+    </thead>
+    <tbody class="divide-y divide-gray-50">
+      {% for r in records %}
+      <tr class="hover:bg-gray-50 transition-colors {% if r.flagged %}bg-red-50{% endif %}">
+        <td class="px-5 py-3 font-medium text-gray-800">{{ r.engineer.name }}</td>
+        <td class="px-5 py-3 text-gray-600">{{ r.site.name if r.site else "Unknown" }}</td>
+        <td class="px-5 py-3 text-gray-600">{{ r.check_in_time | eat_time }}</td>
+        <td class="px-5 py-3 text-gray-600">
+          {% if r.check_out_time %}
+            {{ r.check_out_time | eat_time }}
+          {% else %}
+            <span class="inline-flex items-center gap-1 text-green-600">
+              <span class="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse"></span>
+              On site
+            </span>
+          {% endif %}
+        </td>
+        <td class="px-5 py-3 text-gray-600">
+          {{ "%.1f h" | format(r.hours_on_site) if r.hours_on_site else "—" }}
+        </td>
+        <td class="px-5 py-3">
+          {% if r.flagged %}
+            <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-red-100 text-red-700"
+                  title="{{ r.flag_reason or '' }}">
+              ⚠ Flagged
+            </span>
+          {% else %}
+            <span class="text-gray-300">—</span>
+          {% endif %}
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% else %}
+<p class="px-5 py-6 text-sm text-gray-400 text-center">No check-ins recorded today yet.</p>
+{% endif %}

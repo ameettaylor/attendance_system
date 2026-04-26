@@ -1,0 +1,127 @@
+{% extends "base.html" %}
+
+{% block title %}Technicians — Field Engineer Dispatch{% endblock %}
+{% block page_title %}Technicians{% endblock %}
+
+{% block content %}
+<div class="flex gap-6">
+
+  <!-- ── Add technician form (left panel) ──────────────────────────────────── -->
+  <div class="w-72 shrink-0">
+    <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-5">
+      <h2 class="text-sm font-semibold text-gray-700 mb-4">Add Technician</h2>
+      <form method="post" action="/technicians" class="space-y-4">
+
+        <div>
+          <label class="label">Full name <span class="text-red-400">*</span></label>
+          <input name="name" type="text" required placeholder="Jane Kamau" class="input" />
+        </div>
+
+        <div>
+          <label class="label">WhatsApp number <span class="text-red-400">*</span></label>
+          <input name="whatsapp_number" type="text" required placeholder="+254700000001" class="input" />
+          <p class="mt-1 text-xs text-gray-400">E.164 format, e.g. +254700000001</p>
+        </div>
+
+        <div>
+          <label class="label">Technician type</label>
+          <select name="technician_type" class="input">
+            <option value="">— select —</option>
+            <option value="Project">Project</option>
+            <option value="Maintenance">Maintenance</option>
+            <option value="AdHoc">AdHoc</option>
+          </select>
+        </div>
+
+        <div>
+          <label class="label">Skill level</label>
+          <input name="skill_level" type="text" placeholder="e.g. Senior" class="input" />
+        </div>
+
+        <div>
+          <label class="label">Notification time (EAT)</label>
+          <input name="preferred_notification_time" type="time" class="input" />
+          <p class="mt-1 text-xs text-gray-400">Evening-before job reminder time</p>
+        </div>
+
+        <button type="submit" class="btn-primary w-full">Add Technician</button>
+      </form>
+    </div>
+  </div>
+
+  <!-- ── Technician list ────────────────────────────────────────────────────── -->
+  <div class="flex-1 min-w-0">
+    <div class="bg-white rounded-xl shadow-sm border border-gray-100">
+      <div class="px-5 py-4 border-b border-gray-100 flex items-center justify-between">
+        <h2 class="text-sm font-semibold text-gray-700">
+          Roster
+          <span class="ml-2 text-xs font-normal text-gray-400">{{ engineers | length }} total</span>
+        </h2>
+      </div>
+
+      {% if engineers %}
+      <div class="overflow-x-auto">
+        <table class="w-full text-sm">
+          <thead class="bg-gray-50 text-xs text-gray-500 uppercase tracking-wide">
+            <tr>
+              <th class="px-5 py-3 text-left font-medium">Name</th>
+              <th class="px-5 py-3 text-left font-medium">WhatsApp</th>
+              <th class="px-5 py-3 text-left font-medium">Type</th>
+              <th class="px-5 py-3 text-left font-medium">Level</th>
+              <th class="px-5 py-3 text-left font-medium">Notify</th>
+              <th class="px-5 py-3 text-left font-medium">Status</th>
+              <th class="px-5 py-3 text-left font-medium"></th>
+            </tr>
+          </thead>
+          <tbody class="divide-y divide-gray-50">
+            {% for e in engineers %}
+            <tr class="hover:bg-gray-50 transition-colors {% if not e.active %}opacity-50{% endif %}">
+              <td class="px-5 py-3 font-medium text-gray-800">{{ e.name }}</td>
+              <td class="px-5 py-3 text-gray-500 text-xs font-mono">
+                {{ e.whatsapp_number | replace("whatsapp:", "") }}
+              </td>
+              <td class="px-5 py-3">
+                {% if e.technician_type %}
+                <span class="px-2 py-0.5 rounded text-xs font-medium
+                             {% if e.technician_type == 'Project' %}bg-blue-50 text-blue-700
+                             {% elif e.technician_type == 'Maintenance' %}bg-purple-50 text-purple-700
+                             {% else %}bg-yellow-50 text-yellow-700{% endif %}">
+                  {{ e.technician_type }}
+                </span>
+                {% else %}—{% endif %}
+              </td>
+              <td class="px-5 py-3 text-gray-600">{{ e.skill_level or "—" }}</td>
+              <td class="px-5 py-3 text-gray-600">{{ e.preferred_notification_time or "—" }}</td>
+              <td class="px-5 py-3">
+                {% if e.active %}
+                <span class="px-2 py-0.5 rounded text-xs font-medium bg-green-50 text-green-700">Active</span>
+                {% else %}
+                <span class="px-2 py-0.5 rounded text-xs font-medium bg-gray-100 text-gray-500">Inactive</span>
+                {% endif %}
+              </td>
+              <td class="px-5 py-3">
+                <a href="/technicians/{{ e.id }}/edit"
+                   class="text-xs text-blue-600 hover:underline">Edit</a>
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      {% else %}
+      <p class="px-5 py-10 text-sm text-gray-400 text-center">
+        No technicians registered yet. Use the form to add the first one.
+      </p>
+      {% endif %}
+
+    </div>
+  </div>
+
+</div>
+
+<style>
+  .label { @apply block text-xs font-medium text-gray-600 mb-1; }
+  .input  { @apply w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent; }
+  .btn-primary { @apply rounded-lg bg-blue-600 hover:bg-blue-700 text-white font-medium py-2 px-4 text-sm transition-colors; }
+</style>
+{% endblock %}

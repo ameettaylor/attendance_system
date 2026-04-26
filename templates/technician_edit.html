@@ -1,0 +1,71 @@
+{% extends "base.html" %}
+
+{% block title %}Edit Technician — Field Engineer Dispatch{% endblock %}
+{% block page_title %}Edit Technician{% endblock %}
+
+{% block content %}
+<div class="max-w-lg">
+  <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
+
+    <div class="flex items-center justify-between mb-6">
+      <div>
+        <h2 class="text-base font-semibold text-gray-800">{{ eng.name }}</h2>
+        <p class="text-xs text-gray-400 font-mono mt-0.5">
+          {{ eng.whatsapp_number | replace("whatsapp:", "") }}
+        </p>
+      </div>
+      <a href="/technicians" class="text-sm text-gray-500 hover:text-gray-800">← Back</a>
+    </div>
+
+    <form method="post" action="/technicians/{{ eng.id }}/edit" class="space-y-5">
+
+      <div>
+        <label class="label">Full name <span class="text-red-400">*</span></label>
+        <input name="name" type="text" required value="{{ eng.name }}" class="input" />
+      </div>
+
+      <div>
+        <label class="label">Technician type</label>
+        <select name="technician_type" class="input">
+          <option value="">— none —</option>
+          {% for t in ["Project", "Maintenance", "AdHoc"] %}
+          <option value="{{ t }}" {% if eng.technician_type == t %}selected{% endif %}>{{ t }}</option>
+          {% endfor %}
+        </select>
+      </div>
+
+      <div>
+        <label class="label">Skill level</label>
+        <input name="skill_level" type="text" placeholder="e.g. Senior"
+               value="{{ eng.skill_level or '' }}" class="input" />
+      </div>
+
+      <div>
+        <label class="label">Preferred notification time (EAT)</label>
+        <input name="preferred_notification_time" type="time"
+               value="{{ eng.preferred_notification_time or '' }}" class="input" />
+        <p class="mt-1 text-xs text-gray-400">Evening-before job reminder — HH:MM in EAT (Nairobi time)</p>
+      </div>
+
+      <div class="flex items-center gap-3 pt-1">
+        <input id="active" name="active" type="checkbox" class="w-4 h-4 rounded text-blue-600"
+               {% if eng.active %}checked{% endif %} />
+        <label for="active" class="text-sm text-gray-700">Active (can receive allocations and check in)</label>
+      </div>
+
+      <div class="flex gap-3 pt-2">
+        <button type="submit" class="btn-primary">Save changes</button>
+        <a href="/technicians" class="btn-secondary">Cancel</a>
+      </div>
+
+    </form>
+  </div>
+</div>
+
+<style>
+  .label       { @apply block text-xs font-medium text-gray-600 mb-1; }
+  .input       { @apply w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent; }
+  .btn-primary { @apply rounded-lg bg-blue-600 hover:bg-blue-700 text-white font-medium py-2 px-4 text-sm transition-colors; }
+  .btn-secondary { @apply rounded-lg border border-gray-300 text-gray-600 hover:bg-gray-50 font-medium py-2 px-4 text-sm transition-colors; }
+</style>
+{% endblock %}

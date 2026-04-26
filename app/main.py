@@ -10,12 +10,14 @@ from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, Request
 from fastapi.responses import RedirectResponse
+from fastapi.staticfiles import StaticFiles
 from starlette.middleware.sessions import SessionMiddleware
 
 from app.config import get_settings
 from app.models.db import init_db
 from app.routers import webhook
 from app.routers.auth import AuthRedirect, router as auth_router
+from app.routers.web import router as web_router
 from app.services.scheduler import start_scheduler, stop_scheduler
 
 logging.basicConfig(
@@ -63,8 +65,14 @@ async def auth_redirect_handler(request: Request, exc: AuthRedirect):
     return RedirectResponse(url=exc.url, status_code=302)
 
 
+# ── Static files ─────────────────────────────────────────────────────────────
+import os as _os
+_static_dir = _os.path.join(_os.path.dirname(__file__), "..", "static")
+app.mount("/static", StaticFiles(directory=_os.path.abspath(_static_dir)), name="static")
+
 # ── Routers ───────────────────────────────────────────────────────────────────
 app.include_router(auth_router)
+app.include_router(web_router)
 app.include_router(webhook.router)
 
 

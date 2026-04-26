@@ -1,0 +1,106 @@
+{% extends "base.html" %}
+
+{% block title %}Dashboard — Field Engineer Dispatch{% endblock %}
+{% block page_title %}Dashboard — {{ today.strftime("%A, %d %b %Y") }}{% endblock %}
+
+{% block content %}
+
+<!-- ── Summary cards ─────────────────────────────────────────────────────── -->
+<div class="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+
+  {% set cards = [
+    ("Allocations today", total_allocations, "blue",
+     "M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"),
+    ("Currently on site", on_site, "green",
+     "M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"),
+    ("Checked out", completed, "gray",
+     "M5 13l4 4L19 7"),
+    ("Open alerts", open_alerts, "red" if open_alerts > 0 else "gray",
+     "M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"),
+  ] %}
+
+  {% for label, value, colour, icon_path in cards %}
+  <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-5">
+    <div class="flex items-center justify-between mb-3">
+      <span class="text-xs font-medium text-gray-500 uppercase tracking-wide">{{ label }}</span>
+      <div class="w-8 h-8 rounded-lg flex items-center justify-center
+                  {% if colour == 'blue' %}bg-blue-100{% elif colour == 'green' %}bg-green-100{% elif colour == 'red' %}bg-red-100{% else %}bg-gray-100{% endif %}">
+        <svg class="w-4 h-4
+                    {% if colour == 'blue' %}text-blue-600{% elif colour == 'green' %}text-green-600{% elif colour == 'red' %}text-red-600{% else %}text-gray-500{% endif %}"
+             fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+          <path stroke-linecap="round" stroke-linejoin="round" d="{{ icon_path }}" />
+        </svg>
+      </div>
+    </div>
+    <p class="text-3xl font-bold
+              {% if colour == 'blue' %}text-blue-600{% elif colour == 'green' %}text-green-600{% elif colour == 'red' %}text-red-600{% else %}text-gray-700{% endif %}">
+      {{ value }}
+    </p>
+  </div>
+  {% endfor %}
+
+</div>
+
+<!-- ── Today's allocations ──────────────────────────────────────────────────── -->
+<div class="bg-white rounded-xl shadow-sm border border-gray-100 mb-6">
+  <div class="px-5 py-4 border-b border-gray-100 flex items-center justify-between">
+    <h2 class="text-sm font-semibold text-gray-700">Today's Allocations</h2>
+    <a href="/allocations" class="text-xs text-blue-600 hover:underline">View all →</a>
+  </div>
+
+  {% if allocations_today %}
+  <div class="overflow-x-auto">
+    <table class="w-full text-sm">
+      <thead class="bg-gray-50 text-xs text-gray-500 uppercase tracking-wide">
+        <tr>
+          <th class="px-5 py-3 text-left font-medium">Technician</th>
+          <th class="px-5 py-3 text-left font-medium">Site</th>
+          <th class="px-5 py-3 text-left font-medium">Start (EAT)</th>
+          <th class="px-5 py-3 text-left font-medium">Work</th>
+          <th class="px-5 py-3 text-left font-medium">Status</th>
+        </tr>
+      </thead>
+      <tbody class="divide-y divide-gray-50">
+        {% for a in allocations_today %}
+        <tr class="hover:bg-gray-50 transition-colors">
+          <td class="px-5 py-3 font-medium text-gray-800">{{ a.engineer.name }}</td>
+          <td class="px-5 py-3 text-gray-600">{{ a.site.name }}</td>
+          <td class="px-5 py-3 text-gray-600">{{ a.scheduled_start_time | eat_time }}</td>
+          <td class="px-5 py-3 text-gray-500 max-w-xs truncate">{{ a.work_description or "—" }}</td>
+          <td class="px-5 py-3">
+            <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium
+                         {% if a.notification_sent %}bg-blue-50 text-blue-700{% else %}bg-gray-100 text-gray-500{% endif %}">
+              {{ "Notified" if a.notification_sent else "Pending" }}
+            </span>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+  <p class="px-5 py-6 text-sm text-gray-400 text-center">No allocations for today.</p>
+  {% endif %}
+</div>
+
+<!-- ── Live activity feed (HTMX polling every 60s) ──────────────────────────── -->
+<div class="bg-white rounded-xl shadow-sm border border-gray-100">
+  <div class="px-5 py-4 border-b border-gray-100 flex items-center justify-between">
+    <h2 class="text-sm font-semibold text-gray-700">Live Activity Feed</h2>
+    <span class="text-xs text-gray-400 flex items-center gap-1">
+      <span class="inline-block w-2 h-2 rounded-full bg-green-400 animate-pulse"></span>
+      Refreshes every 60 s
+    </span>
+  </div>
+  <div
+    id="activity-feed"
+    hx-get="/dashboard/activity"
+    hx-trigger="load, every 60s"
+    hx-swap="innerHTML"
+    class="min-h-[80px]"
+  >
+    <p class="px-5 py-6 text-sm text-gray-400 text-center">Loading…</p>
+  </div>
+</div>
+
+{% endblock %}

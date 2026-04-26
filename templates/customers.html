@@ -1,0 +1,248 @@
+{% extends "base.html" %}
+
+{% block title %}Customers & Sites — Field Engineer Dispatch{% endblock %}
+{% block page_title %}Customers &amp; Sites{% endblock %}
+
+{% block content %}
+
+<!-- ══ CUSTOMERS ═══════════════════════════════════════════════════════════ -->
+<div class="flex gap-6 mb-8">
+
+  <!-- Add customer form -->
+  <div class="w-72 shrink-0">
+    <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-5">
+      <h2 class="text-sm font-semibold text-gray-700 mb-4">Add Customer</h2>
+      <form method="post" action="/customers" class="space-y-4">
+
+        <div>
+          <label class="label">Company / customer name <span class="text-red-400">*</span></label>
+          <input name="name" type="text" required placeholder="Safaricom Ltd" class="input" />
+        </div>
+
+        <div>
+          <label class="label">Contact person</label>
+          <input name="contact_name" type="text" placeholder="John Otieno" class="input" />
+        </div>
+
+        <div>
+          <label class="label">Contact phone</label>
+          <input name="contact_phone" type="text" placeholder="+254700000000" class="input" />
+        </div>
+
+        <div>
+          <label class="label">Address</label>
+          <textarea name="address" rows="2" placeholder="Waiyaki Way, Westlands, Nairobi"
+                    class="input resize-none"></textarea>
+        </div>
+
+        <button type="submit" class="btn-primary w-full">Add Customer</button>
+      </form>
+    </div>
+  </div>
+
+  <!-- Customer list -->
+  <div class="flex-1 min-w-0">
+    <div class="bg-white rounded-xl shadow-sm border border-gray-100">
+      <div class="px-5 py-4 border-b border-gray-100">
+        <h2 class="text-sm font-semibold text-gray-700">
+          Customers
+          <span class="ml-2 text-xs font-normal text-gray-400">{{ customers | length }} total</span>
+        </h2>
+      </div>
+
+      {% if customers %}
+      <div class="overflow-x-auto">
+        <table class="w-full text-sm">
+          <thead class="bg-gray-50 text-xs text-gray-500 uppercase tracking-wide">
+            <tr>
+              <th class="px-5 py-3 text-left font-medium">Name</th>
+              <th class="px-5 py-3 text-left font-medium">Contact</th>
+              <th class="px-5 py-3 text-left font-medium">Phone</th>
+              <th class="px-5 py-3 text-left font-medium">Address</th>
+              <th class="px-5 py-3 text-left font-medium">Status</th>
+              <th class="px-5 py-3 text-left font-medium"></th>
+            </tr>
+          </thead>
+          <tbody class="divide-y divide-gray-50">
+            {% for c in customers %}
+            <tr class="hover:bg-gray-50 transition-colors {% if not c.active %}opacity-50{% endif %}">
+              <td class="px-5 py-3 font-medium text-gray-800">{{ c.name }}</td>
+              <td class="px-5 py-3 text-gray-600">{{ c.contact_name or "—" }}</td>
+              <td class="px-5 py-3 text-gray-600 text-xs font-mono">{{ c.contact_phone or "—" }}</td>
+              <td class="px-5 py-3 text-gray-500 max-w-xs truncate text-xs">{{ c.address or "—" }}</td>
+              <td class="px-5 py-3">
+                {% if c.active %}
+                <span class="px-2 py-0.5 rounded text-xs font-medium bg-green-50 text-green-700">Active</span>
+                {% else %}
+                <span class="px-2 py-0.5 rounded text-xs font-medium bg-gray-100 text-gray-500">Inactive</span>
+                {% endif %}
+              </td>
+              <td class="px-5 py-3">
+                <!-- Inline edit form -->
+                <details class="relative">
+                  <summary class="text-xs text-blue-600 hover:underline cursor-pointer list-none">Edit</summary>
+                  <div class="absolute right-0 z-10 mt-2 w-72 bg-white rounded-xl shadow-lg border border-gray-200 p-4">
+                    <form method="post" action="/customers/{{ c.id }}/edit" class="space-y-3">
+                      <input name="name" type="text" required value="{{ c.name }}" class="input text-xs" placeholder="Name" />
+                      <input name="contact_name" type="text" value="{{ c.contact_name or '' }}" class="input text-xs" placeholder="Contact person" />
+                      <input name="contact_phone" type="text" value="{{ c.contact_phone or '' }}" class="input text-xs" placeholder="Phone" />
+                      <textarea name="address" rows="2" class="input text-xs resize-none" placeholder="Address">{{ c.address or '' }}</textarea>
+                      <div class="flex items-center gap-2">
+                        <input id="cust-active-{{ c.id }}" name="active" type="checkbox"
+                               class="w-3.5 h-3.5 rounded" {% if c.active %}checked{% endif %} />
+                        <label for="cust-active-{{ c.id }}" class="text-xs text-gray-600">Active</label>
+                      </div>
+                      <button type="submit" class="btn-primary w-full text-xs py-1.5">Save</button>
+                    </form>
+                  </div>
+                </details>
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      {% else %}
+      <p class="px-5 py-10 text-sm text-gray-400 text-center">No customers yet. Add one using the form.</p>
+      {% endif %}
+    </div>
+  </div>
+
+</div>
+
+<hr class="border-gray-200 mb-8" />
+
+<!-- ══ SITES ════════════════════════════════════════════════════════════════ -->
+<div class="flex gap-6">
+
+  <!-- Add site form -->
+  <div class="w-72 shrink-0">
+    <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-5">
+      <h2 class="text-sm font-semibold text-gray-700 mb-4">Add Site</h2>
+      <form method="post" action="/sites" class="space-y-4">
+
+        <div>
+          <label class="label">Site name <span class="text-red-400">*</span></label>
+          <input name="name" type="text" required placeholder="Westlands Office" class="input" />
+        </div>
+
+        <div>
+          <label class="label">Address</label>
+          <textarea name="address" rows="2" placeholder="Waiyaki Way, Westlands"
+                    class="input resize-none"></textarea>
+        </div>
+
+        <div class="grid grid-cols-2 gap-2">
+          <div>
+            <label class="label">Latitude <span class="text-red-400">*</span></label>
+            <input name="latitude" type="number" step="any" required
+                   placeholder="-1.2634" class="input" />
+          </div>
+          <div>
+            <label class="label">Longitude <span class="text-red-400">*</span></label>
+            <input name="longitude" type="number" step="any" required
+                   placeholder="36.8031" class="input" />
+          </div>
+        </div>
+
+        <div>
+          <label class="label">Geofence radius (m)</label>
+          <input name="geofence_radius_meters" type="number" step="any" min="10"
+                 placeholder="Leave blank for default (200 m)" class="input" />
+        </div>
+
+        <p class="text-xs text-gray-400">
+          Tip: right-click any location in Google Maps and copy coordinates.
+        </p>
+
+        <button type="submit" class="btn-primary w-full">Add Site</button>
+      </form>
+    </div>
+  </div>
+
+  <!-- Site list -->
+  <div class="flex-1 min-w-0">
+    <div class="bg-white rounded-xl shadow-sm border border-gray-100">
+      <div class="px-5 py-4 border-b border-gray-100">
+        <h2 class="text-sm font-semibold text-gray-700">
+          Sites
+          <span class="ml-2 text-xs font-normal text-gray-400">{{ sites | length }} total</span>
+        </h2>
+      </div>
+
+      {% if sites %}
+      <div class="overflow-x-auto">
+        <table class="w-full text-sm">
+          <thead class="bg-gray-50 text-xs text-gray-500 uppercase tracking-wide">
+            <tr>
+              <th class="px-5 py-3 text-left font-medium">Name</th>
+              <th class="px-5 py-3 text-left font-medium">Address</th>
+              <th class="px-5 py-3 text-left font-medium">Lat / Lon</th>
+              <th class="px-5 py-3 text-left font-medium">Geofence</th>
+              <th class="px-5 py-3 text-left font-medium">Status</th>
+              <th class="px-5 py-3 text-left font-medium"></th>
+            </tr>
+          </thead>
+          <tbody class="divide-y divide-gray-50">
+            {% for s in sites %}
+            <tr class="hover:bg-gray-50 transition-colors {% if not s.active %}opacity-50{% endif %}">
+              <td class="px-5 py-3 font-medium text-gray-800">{{ s.name }}</td>
+              <td class="px-5 py-3 text-gray-500 text-xs max-w-[180px] truncate">{{ s.address or "—" }}</td>
+              <td class="px-5 py-3 text-gray-600 text-xs font-mono">
+                {{ "%.5f" | format(s.latitude) }}, {{ "%.5f" | format(s.longitude) }}
+              </td>
+              <td class="px-5 py-3 text-gray-600 text-xs">
+                {{ ("%.0f m" | format(s.geofence_radius_meters)) if s.geofence_radius_meters else "Default" }}
+              </td>
+              <td class="px-5 py-3">
+                {% if s.active %}
+                <span class="px-2 py-0.5 rounded text-xs font-medium bg-green-50 text-green-700">Active</span>
+                {% else %}
+                <span class="px-2 py-0.5 rounded text-xs font-medium bg-gray-100 text-gray-500">Inactive</span>
+                {% endif %}
+              </td>
+              <td class="px-5 py-3">
+                <details class="relative">
+                  <summary class="text-xs text-blue-600 hover:underline cursor-pointer list-none">Edit</summary>
+                  <div class="absolute right-0 z-10 mt-2 w-72 bg-white rounded-xl shadow-lg border border-gray-200 p-4">
+                    <form method="post" action="/sites/{{ s.id }}/edit" class="space-y-3">
+                      <input name="name" type="text" required value="{{ s.name }}" class="input text-xs" placeholder="Site name" />
+                      <textarea name="address" rows="2" class="input text-xs resize-none" placeholder="Address">{{ s.address or '' }}</textarea>
+                      <div class="grid grid-cols-2 gap-2">
+                        <input name="latitude" type="number" step="any" required
+                               value="{{ s.latitude }}" class="input text-xs" placeholder="Lat" />
+                        <input name="longitude" type="number" step="any" required
+                               value="{{ s.longitude }}" class="input text-xs" placeholder="Lon" />
+                      </div>
+                      <input name="geofence_radius_meters" type="number" step="any"
+                             value="{{ s.geofence_radius_meters or '' }}" class="input text-xs"
+                             placeholder="Geofence radius (m)" />
+                      <div class="flex items-center gap-2">
+                        <input id="site-active-{{ s.id }}" name="active" type="checkbox"
+                               class="w-3.5 h-3.5 rounded" {% if s.active %}checked{% endif %} />
+                        <label for="site-active-{{ s.id }}" class="text-xs text-gray-600">Active</label>
+                      </div>
+                      <button type="submit" class="btn-primary w-full text-xs py-1.5">Save</button>
+                    </form>
+                  </div>
+                </details>
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      {% else %}
+      <p class="px-5 py-10 text-sm text-gray-400 text-center">No sites yet. Add one using the form.</p>
+      {% endif %}
+    </div>
+  </div>
+
+</div>
+
+<style>
+  .label       { @apply block text-xs font-medium text-gray-600 mb-1; }
+  .input       { @apply w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent; }
+  .btn-primary { @apply rounded-lg bg-blue-600 hover:bg-blue-700 text-white font-medium py-2 px-4 text-sm transition-colors; }
+</style>
+{% endblock %}
